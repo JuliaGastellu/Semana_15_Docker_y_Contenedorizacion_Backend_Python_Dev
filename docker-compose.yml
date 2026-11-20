@@ -1,0 +1,68 @@
+services:
+  api:
+    build:
+      context: .
+      target: runtime
+    image: backend-python-week15:local
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:?Configuro POSTGRES_PASSWORD}@db:5432/pulse_blog
+      REDIS_URL: redis://cache:6379/0
+      JWT_SECRET: ${JWT_SECRET:?Configuro JWT_SECRET}
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - uploads:/app/var
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    restart: unless-stopped
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configuro POSTGRES_PASSWORD}
+      POSTGRES_DB: pulse_blog
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-test.sql:/docker-entrypoint-initdb.d/01-test.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pulse_blog"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  cache:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  tests:
+    profiles: ["test"]
+    build:
+      context: .
+      target: test
+    environment:
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/pulse_test
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/pulse_test
+      TEST_REDIS_URL: redis://cache:6379/15
+      REDIS_URL: redis://cache:6379/15
+      JWT_SECRET: clave-exclusiva-de-pruebas-locales-de-bootcamp
+    volumes:
+      - ./reports:/reports
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    command: ["/bin/sh", "-c", "alembic upgrade head && python -m pytest --cov --cov-report=term-missing --cov-report=xml:/reports/coverage.xml -q"]
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:

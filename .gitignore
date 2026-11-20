@@ -1,0 +1,16 @@
+.venv/
+.uv-python/
+.verify-env/
+.coverage
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+reports/
+var/
+.uv-cache/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+
